@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { Id, IMorpho, MarketParams } from "@morpho-org/morpho-blue/src/interfaces/IMorpho.sol";
+import { Id, IMorpho, MarketParams, Market } from "@morpho-org/morpho-blue/src/interfaces/IMorpho.sol";
+import { IIrm } from "@morpho-org/morpho-blue/src/interfaces/IIrm.sol";
 import { MorphoLib } from "@morpho-org/morpho-blue/src/libraries/periphery/MorphoLib.sol";
 import { IOracle } from "@morpho-org/morpho-blue/src/interfaces/IOracle.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -63,25 +64,30 @@ contract MorphoBasics {
         totalBorrowAssets = morpho.expectedBorrowAssets(marketParams, user);
     }
 
-    /// @notice Calculates the health factor of a user in a specific market.
+    /// @notice Calculates the borrow APY (Annual Percentage Yield) for a given market.
+    /// @param marketParams The parameters of the market.
+    /// @param market The state of the market.
+    /// @return borrowApy The calculated borrow APY (scaled by WAD).
+    function borrowAPY(MarketParams memory marketParams, Market memory market)
+        public
+        view
+        returns (uint256 borrowApy)
+    {
+        if (marketParams.irm != address(0)) {
+            borrowApy = IIrm(marketParams.irm).borrowRateView(marketParams, market).wTaylorCompounded(365 days);
+        }
+    }
+
+
+    /// @notice Calculates the leverage of a user in a specific market.
     /// @param marketParams The parameters of the market.
     /// @param id The identifier of the market.
-    /// @param user The address of the user whose health factor is being calculated.
-    /// @return healthFactor The calculated health factor.
-    function userHealthFactor(MarketParams memory marketParams, Id id, address user) public view returns (uint256 healthFactor) {
+    /// @param user The address of the user whose leverage is being calculated.
+    /// @return leverage The calculated leverage.
+    function userLeverage(MarketParams calldata marketParams, Id id, address user) public view returns (uint256 leverage) {
         IMorphoChainlinkOracleV2 oracle = IMorphoChainlinkOracleV2(marketParams.oracle);
-        uint256 _collateral = collateral(id, user);
-        uint256 borrowed = borrowAssetsUser(marketParams, user);
-        uint256 maxBorrow = _collateral.mulDivDown(oracle.price(), oracle.SCALE_FACTOR()).wMulDown(marketParams.lltv);
-        // uint256 maxBorrow2 = (collateral * oracle.price()) / oracle.SCALE_FACTOR() * marketParams.lltv / 1e18;
-        console.log("maxBorrow", maxBorrow);
-        // console.log("maxBorrow2", maxBorrow2);
-        maxBorrow = scaleAmount(maxBorrow, ERC20(marketParams.collateralToken).decimals(), ERC20(marketParams.loanToken).decimals());
-        console.log("maxBorrow scale decimals", maxBorrow);
-        if (borrowed == 0) return type(uint256).max;
-        console.log("borrowed", borrowed);
-        healthFactor = maxBorrow.wDivDown(borrowed);
-        console.log("healthFactor", healthFactor);
+        if (borrowAssetsUser(marketParams, user) == 0) return 1;
+        return calculateActualLeverage(collateral(id, user), borrowAssetsUser(marketParams, user), oracle.price(), oracle.SCALE_FACTOR(), marketParams);
     }
      
 
@@ -97,6 +103,21 @@ contract MorphoBasics {
             return amount * (10 ** (toDecimals - fromDecimals));
         }
         return amount;
+    }
+
+    function calculateActualLeverage(
+        uint256 _collateral, 
+        uint256 loan, 
+        uint256 p, 
+        uint256 oracleScaleFactor,
+        MarketParams calldata marketParams
+    ) internal view returns (uint256) {
+        loan = scaleAmount(
+            loan,
+            ERC20(marketParams.loanToken).decimals(),
+            ERC20(marketParams.collateralToken).decimals()
+        );
+        return _collateral * p * 100 / (_collateral * p - loan * oracleScaleFactor);
     }
 
 }

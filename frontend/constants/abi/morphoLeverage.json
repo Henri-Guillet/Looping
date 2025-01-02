@@ -1,0 +1,225 @@
+[
+    {
+      "inputs": [
+        {
+          "internalType": "contract IMorpho",
+          "name": "_morpho",
+          "type": "address"
+        },
+        {
+          "internalType": "contract IV3SwapRouter",
+          "name": "_swapper",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        }
+      ],
+      "name": "SafeERC20FailedOperation",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "address",
+              "name": "loanToken",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "collateralToken",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "oracle",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "irm",
+              "type": "address"
+            },
+            {
+              "internalType": "uint256",
+              "name": "lltv",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct MarketParams",
+          "name": "marketParams",
+          "type": "tuple"
+        },
+        {
+          "components": [
+            {
+              "internalType": "uint16",
+              "name": "leverageFactor",
+              "type": "uint16"
+            },
+            {
+              "internalType": "uint16",
+              "name": "swapSlippageBps",
+              "type": "uint16"
+            },
+            {
+              "internalType": "uint16",
+              "name": "swapFeeBps",
+              "type": "uint16"
+            }
+          ],
+          "internalType": "struct MorphoLeverage.LeverageParams",
+          "name": "leverageParams",
+          "type": "tuple"
+        },
+        {
+          "internalType": "bool",
+          "name": "fullWithdraw",
+          "type": "bool"
+        }
+      ],
+      "name": "deLeveragedPosition",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint16",
+              "name": "leverageFactor",
+              "type": "uint16"
+            },
+            {
+              "internalType": "uint16",
+              "name": "swapSlippageBps",
+              "type": "uint16"
+            },
+            {
+              "internalType": "uint16",
+              "name": "swapFeeBps",
+              "type": "uint16"
+            }
+          ],
+          "internalType": "struct MorphoLeverage.LeverageParams",
+          "name": "leverageParams",
+          "type": "tuple"
+        },
+        {
+          "internalType": "uint256",
+          "name": "userNewCollateral",
+          "type": "uint256"
+        },
+        {
+          "components": [
+            {
+              "internalType": "address",
+              "name": "loanToken",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "collateralToken",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "oracle",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "irm",
+              "type": "address"
+            },
+            {
+              "internalType": "uint256",
+              "name": "lltv",
+              "type": "uint256"
+            }
+          ],
+          "internalType": "struct MarketParams",
+          "name": "marketParams",
+          "type": "tuple"
+        }
+      ],
+      "name": "leveragePosition",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "morpho",
+      "outputs": [
+        {
+          "internalType": "contract IMorpho",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bytes",
+          "name": "data",
+          "type": "bytes"
+        }
+      ],
+      "name": "onMorphoRepay",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "collateralToSupply",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bytes",
+          "name": "data",
+          "type": "bytes"
+        }
+      ],
+      "name": "onMorphoSupplyCollateral",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "swapper",
+      "outputs": [
+        {
+          "internalType": "contract IV3SwapRouter",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ]

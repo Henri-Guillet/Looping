@@ -208,7 +208,7 @@ describe("Test Looping contracts", function(){
 
             console.log("actualLeverage", actualLeverage);
             console.log("expectedLeverage", expectedLeverage);
-            expect(roundTo(actualLeverage, 2)).to.equal(roundTo(expectedLeverage, 2), `The collateral is incorrect.`);
+            expect(roundTo(actualLeverage, 2)).to.equal(roundTo(expectedLeverage, 2), `The leverage is incorrect.`);
         })
 
         it("Check Looping protocol balances after leverage", async function(){
@@ -228,6 +228,7 @@ describe("Test Looping contracts", function(){
             await expect(morphoLeverageContract.connect(addr1).onMorphoSupplyCollateral(1, "0x1234")).to.be.revertedWith("Caller is not Morpho");
         })
       })
+
 
     //------------------------------------------------------------------------------------------------//
     // Test the deleverage function
@@ -310,7 +311,69 @@ describe("Test Looping contracts", function(){
         })
     })
 
+    //------------------------------------------------------------------------------------------------//
+    // Test MorphoBasics view functions
+    //------------------------------------------------------------------------------------------------//
+    describe("Test MorphoBasics view functions", function(){
+        it("Should return the expected collateral balance", async function(){
+            const amountToDeposit = ethers.parseEther("1");
+            const tx = await collateralContract.connect(addr1).deposit({value: amountToDeposit});
+            await tx.wait();
+    
+            //Approve morpho contract to transfer collateral from User 
+            const tx1 = await collateralContract.connect(addr1).approve(morphoAddress, amountToDeposit);
+            await tx1.wait();
 
+            const tx2 = await morphoContract.connect(addr1).supplyCollateral(marketParams, amountToDeposit, addr1.address, "0x");
+            await tx2.wait();
+
+            let collateralBalance = await morphoBasicsContract.connect(addr1).collateral(marketId, addr1.address);
+            console.log("collateralBalance", collateralBalance);
+            console.log("amountToDeposit", amountToDeposit);
+            expect(collateralBalance.toString()).to.equal(amountToDeposit.toString(), "The collateral balance is incorrect");
+        })
+
+        it("Should return the expected borrow amount", async function () {
+            let amountToBorrow = ethers.parseUnits("100", 6);
+
+            const tx = await morphoContract.connect(addr1).borrow(marketParams, amountToBorrow, 0, addr1.address, addr1.address);
+            await tx.wait();
+
+            let borrowBalance = await morphoBasicsContract.connect(addr1).borrowAssetsUser(marketParams, addr1.address);
+            borrowBalance = Number(ethers.formatUnits(borrowBalance, 6));
+            amountToBorrow = Number(ethers.formatUnits(amountToBorrow, 6));
+
+            expect(roundTo(borrowBalance, 5)).to.equal(roundTo(amountToBorrow, 5), "The borrow balance is incorrect");
+        })
+
+        it("Should return the expected user leverage", async function(){
+            let userLeverage = await morphoBasicsContract.connect(addr1).userLeverage(marketParams, marketId, addr1.address);
+            userLeverage = Number(userLeverage) / 100;
+            //get collateral and loan on morpho
+            ({collateral: collateralOnMorpho, loan: loanOnMorpho} = await getCollateralAndLoanOnMorpho(addr1, marketId, marketParams));
+            let expectedLeverage = collateralOnMorpho * p / (collateralOnMorpho * p - loanOnMorpho);
+            console.log("userLeverage", userLeverage);
+            console.log("expectedLeverage", expectedLeverage);
+            expect(roundTo(userLeverage, 2)).to.equal(roundTo(expectedLeverage, 2), "The user leverage is incorrect");
+        })
+
+        it("Should return a value >0 as an annual APY", async function () {
+            const [
+              totalSupplyAssets,
+              totalSupplyShares,
+              totalBorrowAssets,
+              totalBorrowShares,
+              lastUpdate,
+              fee
+            ] = await morphoContract.connect(addr1).market(marketId);
+          
+            const market = {totalSupplyAssets, totalSupplyShares, totalBorrowAssets, totalBorrowShares, lastUpdate, fee};
+          
+            const borrowApy = await morphoBasicsContract.connect(addr1).borrowAPY(marketParams, market);
+            console.log("borrowApy:", ethers.formatUnits(borrowApy, 18));
+            expect(borrowApy).to.be.greaterThan(0, "The borrow APY is 0");
+          });
+    })
 
 
 
