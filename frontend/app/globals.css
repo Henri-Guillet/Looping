@@ -10,6 +10,13 @@ body {
   .text-balance {
     text-wrap: balance;
   }
+  .line {
+    background-color: hsl(var(--line));
+    height: 0.5px;
+  }
+}
+.custom-slider .bg-secondary {
+  background-color: rgb(143,143,143) !important; /* Votre couleur personnalisée */
 }
 
 .text-ocean-blue-pure {
@@ -41,6 +48,7 @@ body {
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
+    --line: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 222.2 84% 4.9%;
     --chart-1: 12 76% 61%;
@@ -68,6 +76,7 @@ body {
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
     --border: 217.2 32.6% 17.5%;
+    --line: 210 20% 40%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
     --chart-1: 220 70% 50%;

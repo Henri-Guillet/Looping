@@ -41,6 +41,7 @@ contract MorphoBasics {
         morpho = _morpho;
     }
 
+
     // -----------------------------------------------------------------------
     // View Functions
     // -----------------------------------------------------------------------
@@ -86,7 +87,7 @@ contract MorphoBasics {
     /// @return leverage The calculated leverage.
     function userLeverage(MarketParams calldata marketParams, Id id, address user) public view returns (uint256 leverage) {
         IMorphoChainlinkOracleV2 oracle = IMorphoChainlinkOracleV2(marketParams.oracle);
-        if (borrowAssetsUser(marketParams, user) == 0) return 1;
+        if (borrowAssetsUser(marketParams, user) == 0) return 100;
         return calculateActualLeverage(collateral(id, user), borrowAssetsUser(marketParams, user), oracle.price(), oracle.SCALE_FACTOR(), marketParams);
     }
      

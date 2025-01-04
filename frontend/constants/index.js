@@ -5,6 +5,10 @@ export const morphoAddress = "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb"; // mo
 export const morphoBasicsAddress = "0x3abBB0D6ad848d64c8956edC9Bf6f18aC22E1485";
 export const morphoLeverageAddress = "0x021DBfF4A864Aa25c51F0ad2Cd73266Fde66199d";
 
+// token addresses
+export const wethAddress = "0x4200000000000000000000000000000000000006";
+export const usdcAddress = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+
 //Morpho
 export const marketIdWethUsdc = "0x8793cf302b8ffd655ab97bd1c695dbd967807e8367a65cb2f4edaf1380ba1bda"; 
 export const marketParamsWethUsdc = {

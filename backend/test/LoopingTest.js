@@ -32,6 +32,11 @@ describe("Test Looping contracts", function(){
         return Math.round(value * factor) / factor;
     }
 
+    function roundDown(value, decimals) {
+        const factor = 10 ** decimals;
+        return Math.floor(value * factor) / factor;
+      }
+
     async function getCollateralAndLoanOnMorpho(addr1, marketId, marketParams){
         collateral = await morphoBasicsContract.connect(addr1).collateral(marketId, addr1.address);
         collateral = Number(ethers.formatEther(collateral));
@@ -152,7 +157,7 @@ describe("Test Looping contracts", function(){
             swapSlippageBps = 300;
 
             // Calculate the minimum leverage factor required to avoid deleveraging
-            minLeverage = roundTo(minLeverageFactor(initialCollateralOnMorpho, initialLoanOnMorpho, amountToDeposit, swapFeeBps, swapSlippageBps), 2) * 100;
+            minLeverage = roundDown(minLeverageFactor(initialCollateralOnMorpho, initialLoanOnMorpho, amountToDeposit, swapFeeBps, swapSlippageBps), 2) * 100;
             console.log("minLeverageFactor", minLeverage);
 
             // Try to leverage with a leverage factor lower than the minimum required
@@ -354,7 +359,7 @@ describe("Test Looping contracts", function(){
             let expectedLeverage = collateralOnMorpho * p / (collateralOnMorpho * p - loanOnMorpho);
             console.log("userLeverage", userLeverage);
             console.log("expectedLeverage", expectedLeverage);
-            expect(roundTo(userLeverage, 2)).to.equal(roundTo(expectedLeverage, 2), "The user leverage is incorrect");
+            expect(userLeverage).to.equal(roundDown(expectedLeverage, 2), "The user leverage is incorrect");
         })
 
         it("Should return a value >0 as an annual APY", async function () {
@@ -374,6 +379,65 @@ describe("Test Looping contracts", function(){
             expect(borrowApy).to.be.greaterThan(0, "The borrow APY is 0");
           });
     })
+
+    //------------------------------------------------------------------------------------------------//
+    // Test Basic functions on morphoLeverage
+    //------------------------------------------------------------------------------------------------//
+    describe("Test Basic functions on morphoLeverage", function(){
+        it("Should revert if the caller is not the owner", async function(){
+            await expect(morphoLeverageContract.connect(addr1)
+                                            .withdrawFees(marketParams.collateralToken))
+                                            .to.be.revertedWithCustomError(morphoLeverageContract, "OwnableUnauthorizedAccount")
+                                            .withArgs(addr1.address);
+        })
+        it("should supply without leverage the expected amount of collateral", async function(){
+            const amountToDeposit = ethers.parseEther("1");
+            //get initial collateral on morpho
+            ({collateral: initialCollateralOnMorpho} = await getCollateralAndLoanOnMorpho(addr1, marketId, marketParams));
+            const tx = await collateralContract.connect(addr1).deposit({value: amountToDeposit});
+            await tx.wait();
+            //Approve LoopingLeverage contract to transfer collateral from User 
+            const tx1 = await collateralContract.connect(addr1).approve(morphoLeverageContract.target, amountToDeposit);
+            await tx1.wait();
+            const tx2 = await morphoLeverageContract.connect(addr1).supplyCollateral(marketParams, amountToDeposit);
+            await tx2.wait();
+            // get final collateral on morpho
+            ({collateral: collateralOnMorpho} = await getCollateralAndLoanOnMorpho(addr1, marketId, marketParams));
+            expectedCollateral = Number(ethers.formatEther(amountToDeposit)) + initialCollateralOnMorpho;
+            console.log("expectedCollateral", expectedCollateral);
+            console.log("collateralOnMorpho", collateralOnMorpho);
+            expect(collateralOnMorpho).to.equal(expectedCollateral, "The collateral is incorrect");
+        })
+        it("Should repay the expected amount of loan", async function(){
+            const amountToRepay = ethers.parseUnits("100", 6);
+            const amountToBorrow = ethers.parseUnits("300", 6);
+            const tx = await morphoContract.connect(addr1).borrow(marketParams, amountToBorrow, 0, addr1.address, addr1.address);
+            await tx.wait();
+            //get initial loan on morpho
+            ({loan: initialLoanOnMorpho} = await getCollateralAndLoanOnMorpho(addr1, marketId, marketParams));
+            //Approve LoopingLeverage contract to transfer repay amount from User 
+            const tx1 = await loanContract.connect(addr1).approve(morphoLeverageContract.target, amountToRepay);
+            await tx1.wait();
+            const tx2 = await morphoLeverageContract.connect(addr1).repayAmount(marketParams, amountToRepay);
+            await tx2.wait();
+            //get final loan on morpho
+            ({loan: loanOnMorpho} = await getCollateralAndLoanOnMorpho(addr1, marketId, marketParams));
+            expectedLoan = initialLoanOnMorpho - Number(ethers.formatUnits(amountToRepay, 6));
+            console.log("expectedLoan", expectedLoan);
+            console.log("loanOnMorpho", loanOnMorpho);
+            expect(loanOnMorpho.toFixed(2)).to.equal(expectedLoan.toFixed(2), "The loan is incorrect");
+        })
+        it("the owner should be able to withdraw fees", async function(){
+            const fees = await morphoLeverageContract.connect(owner).getFees(marketParams.collateralToken);
+            console.log("fees", fees);
+            await morphoLeverageContract.connect(owner).withdrawFees(marketParams.collateralToken);
+            const feesAfterWithdraw = await morphoLeverageContract.connect(owner).getFees(marketParams.collateralToken);
+            console.log("feesAfterWithdraw", feesAfterWithdraw);
+            expect(feesAfterWithdraw).to.equal(0, "The fees are not 0");
+        })
+    })
+
+
 
 
 

@@ -12,13 +12,14 @@ import { MorphoLib } from "@morpho-org/morpho-blue/src/libraries/periphery/Morph
 import { MarketParamsLib } from "@morpho-org/morpho-blue/src/libraries/MarketParamsLib.sol";
 import { MorphoBalancesLib } from "@morpho-org/morpho-blue/src/libraries/periphery/MorphoBalancesLib.sol";
 import { MorphoStorageLib } from "@morpho-org/morpho-blue/src/libraries/periphery/MorphoStorageLib.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import "hardhat/console.sol";
 
 interface IMorphoChainlinkOracleV2 is IOracle {
     function SCALE_FACTOR() external view returns (uint256);
 }
 
-contract MorphoLeverage is IMorphoSupplyCollateralCallback {
+contract MorphoLeverage is IMorphoSupplyCollateralCallback, Ownable {
     using MorphoLib for IMorpho;
     using MarketParamsLib for MarketParams;
     using SafeERC20 for ERC20;
@@ -35,7 +36,7 @@ contract MorphoLeverage is IMorphoSupplyCollateralCallback {
     // Constructor
     // -----------------------------------------------------------------------
 
-    constructor(IMorpho _morpho, IV3SwapRouter _swapper) {
+    constructor(IMorpho _morpho, IV3SwapRouter _swapper) Ownable(msg.sender) {
         morpho = _morpho;
         swapper = _swapper;
     }
@@ -54,6 +55,7 @@ contract MorphoLeverage is IMorphoSupplyCollateralCallback {
     // -----------------------------------------------------------------------
 
     mapping(address => uint256) private userSwappedAmount;
+    mapping(address => uint256) private feesPerToken;
 
     struct SupplyCollateralData {
         uint256 loanAmount;
@@ -98,7 +100,32 @@ contract MorphoLeverage is IMorphoSupplyCollateralCallback {
         uint256 toWithdraw;
     }
 
+    // -----------------------------------------------------------------------
+    // Managing Functions without leverage
+    // -----------------------------------------------------------------------
 
+
+    function supplyCollateral(MarketParams memory marketParams, uint256 amount) external {
+        ERC20(marketParams.collateralToken).forceApprove(address(morpho), type(uint256).max);
+        ERC20(marketParams.collateralToken).safeTransferFrom(msg.sender, address(this), amount);
+
+        address onBehalf = msg.sender;
+
+        morpho.supplyCollateral(marketParams, amount, onBehalf, hex"");
+    }
+
+
+    function repayAmount(MarketParams memory marketParams, uint256 amount)
+        external
+        returns (uint256 assetsRepaid, uint256 sharesRepaid)
+    {
+        ERC20(marketParams.loanToken).forceApprove(address(morpho), type(uint256).max);
+        ERC20(marketParams.loanToken).safeTransferFrom(msg.sender, address(this), amount);
+
+        uint256 shares;
+        address onBehalf = msg.sender;
+        (assetsRepaid, sharesRepaid) = morpho.repay(marketParams, amount, shares, onBehalf, hex"");
+    }
 
     // -----------------------------------------------------------------------
     // Leverage Functions
@@ -110,22 +137,13 @@ contract MorphoLeverage is IMorphoSupplyCollateralCallback {
 
         //Net collateral on morpho
         data.morphoBalance = morpho.collateral(marketParams.id(), msg.sender) - morpho.expectedBorrowAssets(marketParams, msg.sender) * oracle.SCALE_FACTOR() * 1e12  / oracle.price();
-        console.log("initialLoanOnMorpho", morpho.expectedBorrowAssets(marketParams, msg.sender));
-        console.log("collateral morpho", morpho.collateral(marketParams.id(), msg.sender));
-        console.log("morphoBalance", data.morphoBalance);
-        console.log("oracle.SCALE_FACTOR()", oracle.SCALE_FACTOR());
-        console.log("oracle.price()", oracle.price());
-        console.log("leverageParams.leverageFactor", leverageParams.leverageFactor);
-
-
 
         // Deduct protocol fees (0.1%) on the new collateral added
+        feesPerToken[marketParams.collateralToken] = feesPerToken[marketParams.collateralToken] + (userNewCollateral / 1000);
         data.newCollateralAdded = userNewCollateral - (userNewCollateral / 1000);
-        console.log("newCollateralAdded", data.newCollateralAdded);
 
         // Define the initial collateral in the formula
         data.c_0 = data.morphoBalance + data.newCollateralAdded;
-        console.log("c_0", data.c_0);
 
         // Min leverage factor so final loan is > to the initial loan (i.e no deleveraging)
         // Lmin = L_ini * ( 1 - f) + c_0 * p / ( c_0 * p - L_ini * f)
@@ -157,7 +175,6 @@ contract MorphoLeverage is IMorphoSupplyCollateralCallback {
             leverageParams.swapSlippageBps,
             marketParams
         );
-        console.log("amount to loan", loanAmount);
 
         // Total collateral expected on morpho in the end
         // C_final = C_0 * + Loan * (1-f) / P
@@ -166,18 +183,15 @@ contract MorphoLeverage is IMorphoSupplyCollateralCallback {
         ERC20(marketParams.loanToken).decimals(),
         ERC20(marketParams.collateralToken).decimals()
         );
-        console.log("totalCollateralExpected", data.totalCollateralExpected);
 
         //Collateral to add on morpho on top of the current collateral
         data.collateralToSupply = data.totalCollateralExpected - morpho.collateral(marketParams.id(), msg.sender);
-        console.log("collateralToSupply", data.collateralToSupply);
 
         // Approve Morpho to handle collateral tokens to supply on morpho
         ERC20(marketParams.collateralToken).forceApprove(address(morpho), type(uint256).max);
 
         //Amount to borrow considering the initial loan on morpho
         loanAmount = loanAmount - morpho.expectedBorrowAssets(marketParams, msg.sender);
-        console.log("loanAmount after considering initial loan", loanAmount);
 
         // Supply collateral and trigger the callback for the borrowing and swapping process
         morpho.supplyCollateral(
@@ -196,12 +210,8 @@ contract MorphoLeverage is IMorphoSupplyCollateralCallback {
             )
         );
 
-        console.log("userSwappedAmount[msg.sender]", userSwappedAmount[msg.sender]);
-        console.log("collateralToSupply", data.collateralToSupply);
-        console.log("balance of collateral", ERC20(marketParams.collateralToken).balanceOf(address(this)));
         // Send back the extra amount of token not used during the swap to the user
         ERC20(marketParams.collateralToken).safeTransferFrom(address(this), msg.sender, userSwappedAmount[msg.sender] + data.newCollateralAdded - data.collateralToSupply);
-        console.log("balance of collateral", ERC20(marketParams.collateralToken).balanceOf(address(this)));
     }
 
     function deLeveragedPosition(MarketParams calldata marketParams, LeverageParams calldata leverageParams, bool fullWithdraw) public  {
@@ -246,7 +256,6 @@ contract MorphoLeverage is IMorphoSupplyCollateralCallback {
                 oracle.SCALE_FACTOR(),
                 marketParams
             );
-            console.log("actualLeverage", actualLeverage);
 
             // Make sure the desired leverage is lower than the actual leverage
             require(actualLeverage > leverageParams.leverageFactor, "Desired leverage is too high");
@@ -264,7 +273,6 @@ contract MorphoLeverage is IMorphoSupplyCollateralCallback {
                 marketParams
             );
 
-            console.log("toWithdraw", data.toWithdraw);
             // Amount to repay is the amount to withdraw considering conversion rate, swapping fees and pool fees
             // Amount to repay = amountToWithdraw * conversionRate * (1 - Swappingfees) * (1 - Poolfees)
             data.toRepay = data.toWithdraw * oracle.price() / oracle.SCALE_FACTOR() * (10000 - leverageParams.swapFeeBps) / 10000 * (10000 - leverageParams.swapSlippageBps) / 10000;
@@ -273,7 +281,6 @@ contract MorphoLeverage is IMorphoSupplyCollateralCallback {
                 ERC20(marketParams.collateralToken).decimals(),
                 ERC20(marketParams.loanToken).decimals()
             );
-            console.log("amountToRepay", data.toRepay);
             morpho.repay(
                 marketParams, 
                 data.toRepay, 
@@ -289,11 +296,7 @@ contract MorphoLeverage is IMorphoSupplyCollateralCallback {
             );
         }
 
-        console.log("balance of collateral", ERC20(marketParams.collateralToken).balanceOf(address(this)));
-
         // Transfer the remaining collateral back to the user
-        console.log("toWithdraw", data.toWithdraw);
-        console.log("userSwappedAmount[msg.sender]", userSwappedAmount[msg.sender]);
         ERC20(marketParams.collateralToken).safeTransferFrom(address(this), msg.sender, data.toWithdraw - userSwappedAmount[msg.sender]);
     }    
 
@@ -307,7 +310,6 @@ contract MorphoLeverage is IMorphoSupplyCollateralCallback {
         SupplyCollateralData memory supplyData = abi.decode(data, (SupplyCollateralData));
 
         // Borrow against the supplied collateral
-        console.log("borrowedAmount", supplyData.loanAmount);
         (uint256 borrowedAmount, ) = morpho.borrow(
             supplyData.marketParams,
             supplyData.loanAmount,
@@ -316,14 +318,9 @@ contract MorphoLeverage is IMorphoSupplyCollateralCallback {
             address(this)
         );
 
-        console.log("supplyData.newCollateralAdded", supplyData.newCollateralAdded);
-        console.log("morphoInitialCollateral", supplyData.morphoInitialCollateral);
-        console.log("collateralToSupply", collateralToSupply);
-        uint256 minimumSwappedAmount = collateralToSupply - supplyData.newCollateralAdded;
-        console.log("minimumCollateralOut", minimumSwappedAmount);   
+        uint256 minimumSwappedAmount = collateralToSupply - supplyData.newCollateralAdded;  
 
         ERC20(supplyData.marketParams.loanToken).forceApprove(address(swapper), borrowedAmount);
-
 
         IV3SwapRouter.ExactInputSingleParams memory swapParams = IV3SwapRouter.ExactInputSingleParams({
             tokenIn: supplyData.marketParams.loanToken,
@@ -336,20 +333,13 @@ contract MorphoLeverage is IMorphoSupplyCollateralCallback {
         });
 
         userSwappedAmount[supplyData.user] = swapper.exactInputSingle(swapParams);
-        console.log("Swapped amount:", userSwappedAmount[supplyData.user]);
-        console.log("balance of collateral", ERC20(supplyData.marketParams.collateralToken).balanceOf(address(this)));
     }
 
     // Callback for the repay function
     function onMorphoRepay(uint256 amount, bytes calldata data) external onlyMorpho {
         RepayData memory repayData = abi.decode(data, (RepayData));
-        console.log("toWithdraw", repayData.toWithdraw);
         morpho.withdrawCollateral(repayData.marketParams, repayData.toWithdraw, repayData.user, address(this));
-        console.log("collat withdrawn");
-
         ERC20(repayData.marketParams.collateralToken).forceApprove(address(swapper), repayData.toWithdraw);
-        console.log("toWithdraw", repayData.toWithdraw);
-        console.log("amount", amount);
 
         IV3SwapRouter.ExactOutputSingleParams memory swapParams = IV3SwapRouter.ExactOutputSingleParams({
             tokenIn: repayData.marketParams.collateralToken,
@@ -362,7 +352,20 @@ contract MorphoLeverage is IMorphoSupplyCollateralCallback {
         });
 
         userSwappedAmount[repayData.user] = swapper.exactOutputSingle(swapParams);
-        console.log("Swapped amount:", userSwappedAmount[repayData.user]);
+    }
+
+     // -----------------------------------------------------------------------
+    // Fees Functions
+    // ----------------------------------------------------------------------- 
+
+    function withdrawFees(address collateralToken) external onlyOwner {
+        uint256 feesToWithdraw = feesPerToken[collateralToken];
+        feesPerToken[collateralToken] = 0;
+        ERC20(collateralToken).safeTransfer(owner(), feesToWithdraw);
+    }
+
+    function getFees(address collateralToken) external view returns (uint256) {
+        return feesPerToken[collateralToken];
     }
 
     // -----------------------------------------------------------------------
@@ -387,7 +390,6 @@ contract MorphoLeverage is IMorphoSupplyCollateralCallback {
         uint256 denominator = c0_P * 10000 - l_ini * (10000*10000 - (10000 - swapFeeBps) * (10000 - swapSlippageBps))/ 10000;
         //min leverage factor
         uint256 minLeverageFactor = numerator * 100 / denominator;
-        console.log("minLeverageFactor", minLeverageFactor);
         return minLeverageFactor;
     }
 
@@ -407,9 +409,6 @@ contract MorphoLeverage is IMorphoSupplyCollateralCallback {
         uint256 denominator = (10000 - swapFeeBps) * (10000 - swapSlippageBps) * 100 + leverageFactor * (10000 * 10000 - (10000 - swapFeeBps) * (10000 - swapSlippageBps));
         //loan amount
         uint256 loanAmount = numerator / denominator;
-        
-        console.log("Base loan amount:", loanAmount);
-        console.log("oracleprice", p);
 
         //adjust amount to match the loan token decimals
         loanAmount = scaleAmount(
@@ -417,7 +416,6 @@ contract MorphoLeverage is IMorphoSupplyCollateralCallback {
             ERC20(marketParams.collateralToken).decimals(),
             ERC20(marketParams.loanToken).decimals()
         );
-        console.log("Lraw:", loanAmount);
         return loanAmount;
     }
 
@@ -439,15 +437,10 @@ contract MorphoLeverage is IMorphoSupplyCollateralCallback {
         );
 
         uint256 numerator = c_0 * p - leverageFactor * (c_0 * p - l_ini * oracleScaleFactor) / 100;
-
-        console.log("numerator", numerator);
         //denominator -> p * ( 1 - Ltarget * f)
         uint256 denominator = p * (10000*10000*100 - leverageFactor * (10000 * 10000 - (10000 - swapFeeBps) * (10000 - swapSlippageBps))) /  (10000*10000*100) ;
-        console.log("p", p);
-        console.log("denominator", denominator);
         //amount to swap
         uint256 amountToWithdraw = numerator / denominator;
-        console.log("amountToWithdraw", amountToWithdraw);
         return amountToWithdraw;
     }
 

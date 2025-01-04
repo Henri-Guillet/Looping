@@ -25,21 +25,21 @@ async function main() {
     [owner, addr1, addr2] = await ethers.getSigners();
     console.log("address of signer 1:", addr1.address);
     collateralContract = await ethers.getContractAt(wethAbi, collateralAddress);
-    amountToDeposit = ethers.parseEther("1");
+    amountToDeposit = ethers.parseEther("10");
     const tx = await collateralContract.connect(addr1).deposit({value: amountToDeposit});
     await tx.wait();
 
-    const tx1 = await collateralContract.connect(addr1).approve(morphoAddress, amountToDeposit);
-    await tx1.wait();
+    // const tx1 = await collateralContract.connect(addr1).approve(morphoAddress, amountToDeposit);
+    // await tx1.wait();
 
-    const tx2 = await morphoContract.connect(addr1).supplyCollateral(marketParams, amountToDeposit, addr1.address, "0x");
-    await tx2.wait();
+    // const tx2 = await morphoContract.connect(addr1).supplyCollateral(marketParams, amountToDeposit, addr1.address, "0x");
+    // await tx2.wait();
 
-    //borrow 500 usdc
-    let amountToBorrow = ethers.parseUnits("500", 6);
+    // //borrow 500 usdc
+    // let amountToBorrow = ethers.parseUnits("500", 6);
 
-    const tx3 = await morphoContract.connect(addr1).borrow(marketParams, amountToBorrow, 0, addr1.address, addr1.address);
-    await tx3.wait();
+    // const tx3 = await morphoContract.connect(addr1).borrow(marketParams, amountToBorrow, 0, addr1.address, addr1.address);
+    // await tx3.wait();
 
     //authorize looping
     // const tx4 = await morphoContract.connect(addr1).setAuthorization(morphoLeverageAddress, true);
