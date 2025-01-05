@@ -5,7 +5,7 @@
 
 ## Description
 
-**Looping** is a web application that interacts with the [Morpho](https://morpho.org/) lending/borrowing protocol by forking the Base mainnet network using Hardhat. It allows users to create and manage positions with or without leverage directly from the interface.
+**Looping** is a DApp project built on a fork of the Base Mainnet network using Hardhat. It interacts with the [Morpho](https://morpho.org/) lending/borrowing protocol, allowing users to create and manage positions with or without leverage directly from the interface.
 
 ## Features
 
