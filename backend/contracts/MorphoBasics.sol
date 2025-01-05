@@ -47,28 +47,14 @@ contract MorphoBasics {
     // -----------------------------------------------------------------------
 
 
-
-   /// @notice Calculates the total collateral balance of a given user in a specific market.
-    /// @dev It uses extSloads to load only one storage slot of the Position struct and save gas.
-    /// @param marketId The identifier of the market.
-    /// @param user The address of the user whose collateral balance is being calculated.
-    /// @return totalCollateralAssets The calculated total collateral balance.
     function collateral(Id marketId, address user) public view returns (uint256 totalCollateralAssets) {
         totalCollateralAssets = morpho.collateral(marketId, user);
     }
 
-    /// @notice Calculates the total borrow balance of a given user in a specific market.
-    /// @param marketParams The parameters of the market.
-    /// @param user The address of the user whose borrow balance is being calculated.
-    /// @return totalBorrowAssets The calculated total borrow balance.
     function borrowAssetsUser(MarketParams memory marketParams, address user) public view returns (uint256 totalBorrowAssets) {
         totalBorrowAssets = morpho.expectedBorrowAssets(marketParams, user);
     }
 
-    /// @notice Calculates the borrow APY (Annual Percentage Yield) for a given market.
-    /// @param marketParams The parameters of the market.
-    /// @param market The state of the market.
-    /// @return borrowApy The calculated borrow APY (scaled by WAD).
     function borrowAPY(MarketParams memory marketParams, Market memory market)
         public
         view
@@ -79,19 +65,12 @@ contract MorphoBasics {
         }
     }
 
-
-    /// @notice Calculates the leverage of a user in a specific market.
-    /// @param marketParams The parameters of the market.
-    /// @param id The identifier of the market.
-    /// @param user The address of the user whose leverage is being calculated.
-    /// @return leverage The calculated leverage.
     function userLeverage(MarketParams calldata marketParams, Id id, address user) public view returns (uint256 leverage) {
         IMorphoChainlinkOracleV2 oracle = IMorphoChainlinkOracleV2(marketParams.oracle);
         if (borrowAssetsUser(marketParams, user) == 0) return 100;
         return calculateActualLeverage(collateral(id, user), borrowAssetsUser(marketParams, user), oracle.price(), oracle.SCALE_FACTOR(), marketParams);
     }
      
-
     // -----------------------------------------------------------------------
     // Helper Functions
     // -----------------------------------------------------------------------

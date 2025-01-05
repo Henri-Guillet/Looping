@@ -41,21 +41,6 @@ module.exports = {
       accounts: [`0x${PK}`]
     },
     hardhat: {
-      // forking: {
-      //   url: `https://base-sepolia.infura.io/v3/${INFURA_API_KEY}`,
-      //   enabled: true,
-      //   blocknumber: 18424438
-      // }
-      // forking: {
-      //   url: `https://sepolia.infura.io/v3/${INFURA_API_KEY}`,
-      //   enabled: true,
-      //   blocknumber: 7216877
-      // }
-      // forking: {
-      //   url: `https://mainnet.infura.io/v3/${INFURA_API_KEY}`,
-      //   enabled: true,
-      //   blocknumber: 21336919
-      // }
       forking: {
         url: `https://base-mainnet.infura.io/v3/${INFURA_API_KEY}`,
         enabled: true,

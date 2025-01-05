@@ -179,7 +179,7 @@ const ManageCollateralCard = ({
             </div>
             <div className="flex justify-between items-center gap-4">
   <p className="text-muted-foreground text-xs">
-    Swap Fee - 0.3%
+    Swap Fees - 0.3%
   </p>
   <div className="flex items-center gap-2">
     <Label className="text-muted-foreground text-xs">Slippage Tolerance</Label>

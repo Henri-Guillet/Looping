@@ -146,7 +146,8 @@ contract MorphoLeverage is IMorphoSupplyCollateralCallback, Ownable {
         data.c_0 = data.morphoBalance + data.newCollateralAdded;
 
         // Min leverage factor so final loan is > to the initial loan (i.e no deleveraging)
-        // Lmin = L_ini * ( 1 - f) + c_0 * p / ( c_0 * p - L_ini * f)
+        // Lmin = (L_ini * ( 1 - f) + c_0 * p) / ( c_0 * p - L_ini * f)
+        // with f = (1-swapSlippageBps/10000) * (1-swapFeeBps/10000) 
         uint256 minLeverageFactor = calculateMinLeverageFactor(
             data.c_0,
             morpho.expectedBorrowAssets(marketParams, msg.sender),
@@ -226,7 +227,6 @@ contract MorphoLeverage is IMorphoSupplyCollateralCallback, Ownable {
         if (fullWithdraw) {
             uint256 totalShares = morpho.borrowShares(marketParams.id(), msg.sender);
             data.toWithdraw = morpho.collateral(marketParams.id(), msg.sender);
-            console.log("totalShares", totalShares);
             morpho.repay(
                 marketParams, 
                 0, 
@@ -247,7 +247,6 @@ contract MorphoLeverage is IMorphoSupplyCollateralCallback, Ownable {
 
             // Define the initial collateral in the formula
             data.c_0 = morpho.collateral(marketParams.id(), msg.sender);
-            console.log("c_0", data.c_0);
 
             uint256 actualLeverage = calculateActualLeverage(
                 data.c_0,
@@ -373,7 +372,7 @@ contract MorphoLeverage is IMorphoSupplyCollateralCallback, Ownable {
     // -----------------------------------------------------------------------
 
     // Min leverage factor so final loan is > to the initial loan (i.e no deleveraging)
-    // Lmin = L_ini * ( 1 - f) + c_0 * p / ( c_0 * p - L_ini * f)
+    // Lmin = (L_ini * ( 1 - f) + c_0 * p) / ( c_0 * p - L_ini * f)
     function calculateMinLeverageFactor(
         uint256 c_0,
         uint256 l_ini,
