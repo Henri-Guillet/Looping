@@ -75,7 +75,7 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ## Contact
 
-- **Author**: [Your Name](mailto:guillet.henri@gmail.com)
+- **Author**: [Henri Guillet](mailto:guillet.henri@gmail.com)
 - **GitHub**: [Henri-Guillet](https://github.com/Henri-Guillet)
 
 ---
